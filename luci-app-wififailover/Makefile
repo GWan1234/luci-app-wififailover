@@ -5,7 +5,7 @@ include $(TOPDIR)/rules.mk
 
 LUCI_TITLE:=WiFi Failover
 LUCI_DESCRIPTION:=Automatic WiFi network switching on internet connection loss
-LUCI_DEPENDS:=+iw +wpad-mini +curl +luci-base
+LUCI_DEPENDS:=+iw +wpad-mini +luci-base # +curl
 LUCI_PKGARCH:=all
 
 PKG_NAME:=luci-app-wififailover
