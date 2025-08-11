@@ -14,29 +14,29 @@ function index()
     end
 
     -- Главное меню
-    local page = entry({"admin", "services", "wififailover"}, firstchild(), _("WiFi Failover"), 60)
+    local page = entry({"admin", "network", "wififailover"}, firstchild(), _("WiFi Failover"), 60)
     page.dependent = false
     page.acl_depends = { "luci-app-wififailover" }
 
     -- Вкладка настроек
-    entry({"admin", "services", "wififailover", "config"}, 
+    entry({"admin", "network", "wififailover", "config"}, 
           cbi("wififailover/config"), _("Configuration"), 1)
 
     -- Вкладка статуса
-    entry({"admin", "services", "wififailover", "status"}, 
+    entry({"admin", "network", "wififailover", "status"}, 
           call("action_status"), _("Status"), 2)
 
     -- API endpoints для AJAX
-    entry({"admin", "services", "wififailover", "scan"}, 
+    entry({"admin", "network", "wififailover", "scan"}, 
           call("action_scan_wifi"), nil).leaf = true
           
-    entry({"admin", "services", "wififailover", "test_connection"}, 
+    entry({"admin", "network", "wififailover", "test_connection"}, 
           call("action_test_connection"), nil).leaf = true
           
-    entry({"admin", "services", "wififailover", "switch_network"}, 
+    entry({"admin", "network", "wififailover", "switch_network"}, 
           call("action_switch_network"), nil).leaf = true
           
-    entry({"admin", "services", "wififailover", "logs"}, 
+    entry({"admin", "network", "wififailover", "logs"}, 
           call("action_get_logs"), nil).leaf = true
 end
 
