@@ -1,43 +1,25 @@
 #!/usr/bin/lua
--- Файл: files/usr/lib/wififailover/utils.lua
--- Утилиты для работы с Wi-Fi и UCI конфигурацией (LEDE 17.01.7)
 
--- Создание глобального пространства имен для совместимости с require
 package.path = package.path .. ";/usr/lib/wififailover/?.lua"
 
 local uci = require "uci"
-local fs = require "nixio.fs"
 
+package.path = package.path .. ";/usr/lib/wififailover/?.lua"
+local uci = require "uci"
 local utils = {}
-
--- Инициализация UCI курсора
 local cursor = uci.cursor()
 
--- Логирование
 function utils.log(level, message)
-    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
-    local log_entry = string.format("[%s] [%s] %s", timestamp, level, message)
-    
-    -- Запись в syslog
-    os.execute(string.format("logger -t wififailover '%s'", message))
-    
-    -- Запись в файл лога если включен debug
-    local debug = cursor:get("wififailover", "settings", "debug")
-    if debug == "1" then
-        local log_file = "/tmp/wififailover.log"
-        local file = io.open(log_file, "a")
-        if file then
-            file:write(log_entry .. "\n")
-            file:close()
-        end
+    os.execute("logger -t wififailover '" .. message .. "'")
+    if cursor:get("wififailover", "settings", "debug") == "1" then
+        local f = io.open("/tmp/wififailover.log", "a")
+        if f then f:write(message .. "\n"); f:close() end
     end
 end
 
--- Получение настроек из UCI
 function utils.get_settings()
     cursor:load("wififailover")
-    
-    local settings = {
+    return {
         enabled = cursor:get("wififailover", "settings", "enabled") or "0",
         ping_host = cursor:get("wififailover", "settings", "ping_host") or "8.8.8.8",
         check_interval = tonumber(cursor:get("wififailover", "settings", "check_interval")) or 30,
@@ -47,35 +29,23 @@ function utils.get_settings()
         current_network = cursor:get("wififailover", "settings", "current_network") or "",
         auto_switch = cursor:get("wififailover", "settings", "auto_switch") or "1"
     }
-    
-    return settings
 end
 
--- Получение списка сетей из UCI
 function utils.get_networks()
     cursor:load("wififailover")
-    local networks = {}
-    
-    cursor:foreach("wififailover", "network", function(section)
-        if section.enabled == "1" then
-            table.insert(networks, {
-                id = section[".name"],
-                ssid = section.ssid,
-                key = section.key or "",
-                priority = tonumber(section.priority) or 999,
-                security = section.security or "psk2",
-                last_connected = tonumber(section.last_connected) or 0
+    local n = {}
+    cursor:foreach("wififailover", "network", function(s)
+        if s.enabled == "1" then
+            table.insert(n, {
+                id = s[".name"], ssid = s.ssid, key = s.key or "", priority = tonumber(s.priority) or 999,
+                security = s.security or "psk2", last_connected = tonumber(s.last_connected) or 0
             })
         end
     end)
-    
-    -- Сортировка по приоритету
-    table.sort(networks, function(a, b) return a.priority < b.priority end)
-    
-    return networks
+    table.sort(n, function(a, b) return a.priority < b.priority end)
+    return n
 end
 
--- Обновление текущей сети в UCI
 function utils.set_current_network(ssid)
     cursor:load("wififailover")
     cursor:set("wififailover", "settings", "current_network", ssid)
@@ -83,117 +53,76 @@ function utils.set_current_network(ssid)
     utils.log("INFO", "Current network set to: " .. ssid)
 end
 
--- Обновление времени последнего подключения
 function utils.update_last_connected(network_id)
     cursor:load("wififailover")
     cursor:set("wififailover", "settings", network_id, "last_connected", tostring(os.time()))
     cursor:commit("wififailover")
 end
 
--- Проверка доступности интернета
 function utils.check_internet(host, timeout)
-    host = host or "8.8.8.8"
-    timeout = timeout or 5
-    
-    local cmd = string.format("ping -c 1 -W %d %s >/dev/null 2>&1", timeout, host)
-    local result = os.execute(cmd)
-    
-    -- В Lua 5.1 os.execute возвращает число, в 5.2+ boolean
-    local success = (result == 0 or result == true)
-    
-    if success then
-        utils.log("DEBUG", "Internet check successful")
-    else
-        utils.log("DEBUG", "Internet check failed")
-    end
-    
-    return success
+    host = host or "8.8.8.8"; timeout = timeout or 5
+    local r = os.execute("ping -c 1 -W " .. timeout .. " " .. host .. " >/dev/null 2>&1")
+    return r == 0 or r == true
 end
 
--- Получение текущей Wi-Fi сети
 function utils.get_current_wifi()
-    local handle = io.popen("iw dev wlan0 link 2>/dev/null | grep 'SSID' | awk '{print $2}'")
-    local ssid = handle:read("*a"):match("^%s*(.-)%s*$")
-    handle:close()
-    
-    return ssid and ssid ~= "" and ssid or nil
+    local h = io.popen("iw dev wlan0 link 2>/dev/null | grep 'SSID' | awk '{print $2}'")
+    local s = h:read("*a"):match("^%s*(.-)%s*$")
+    h:close()
+    return s ~= "" and s or nil
 end
 
--- Сканирование доступных Wi-Fi сетей (LEDE 17.01 совместимо)
 function utils.scan_wifi()
-    local available = {}
-    
-    -- Попытка использовать iw, fallback на iwlist
-    local scan_cmd = "iw dev wlan0 scan 2>/dev/null | grep 'SSID:' | sed 's/.*SSID: //' 2>/dev/null"
-    local handle = io.popen(scan_cmd)
-    
-    if handle then
-        for line in handle:lines() do
-            line = line:match("^%s*(.-)%s*$") -- trim whitespace
-            if line and line ~= "" and line ~= "\\x00" then
-                available[line] = true
-            end
-        end
-        handle:close()
-    end
-    
-    -- Fallback для LEDE 17.01
-    if next(available) == nil then
-        local iwlist_cmd = "iwlist wlan0 scan 2>/dev/null | grep 'ESSID:' | sed 's/.*ESSID:\"//' | sed 's/\".*//' 2>/dev/null"
-        handle = io.popen(iwlist_cmd)
-        
-        if handle then
-            for line in handle:lines() do
-                line = line:match("^%s*(.-)%s*$")
-                if line and line ~= "" then
-                    available[line] = true
-                end
-            end
-            handle:close()
-        end
-    end
-    
-    return available
+    local a = {}
+    local h = io.popen("iw dev wlan0 scan 2>/dev/null | grep 'SSID:' | sed 's/.*SSID: //' 2>/dev/null")
+    if h then for l in h:lines() do l = l:match("^%s*(.-)%s*$"); if l and l ~= "" then a[l] = true end end; h:close() end
+    return a
 end
 
--- Подключение к Wi-Fi сети (совместимо с LEDE 17.01)
 function utils.connect_wifi(ssid, key, security)
     utils.log("INFO", "Attempting to connect to: " .. ssid)
-    
-    -- Получение wireless конфигурации
     cursor:load("wireless")
-    
-    -- Поиск WiFi интерфейса
-    local wifi_iface_section = nil
+    local iface
     cursor:foreach("wireless", "wifi-iface", function(s)
-        if s.device and s.mode == "sta" then
-            wifi_iface_section = s[".name"]
-            return false  -- Прекращаем поиск
-        end
+        if s.device and s.mode == "sta" then iface = s[".name"]; return false end
     end)
-    
-    if not wifi_iface_section then
-        utils.log("ERROR", "WiFi client interface not found")
-        return false
-    end
-    
-    -- Настройка новой сети
-    cursor:set("wireless", wifi_iface_section, "ssid", ssid)
-    cursor:set("wireless", wifi_iface_section, "disabled", "0")
-    
+    if not iface then utils.log("ERROR", "WiFi client interface not found"); return false end
+    cursor:set("wireless", iface, "ssid", ssid)
+    cursor:set("wireless", iface, "disabled", "0")
     if key and key ~= "" then
-        cursor:set("wireless", wifi_iface_section, "key", key)
-        cursor:set("wireless", wifi_iface_section, "encryption", security or "psk2")
+        cursor:set("wireless", iface, "key", key)
+        cursor:set("wireless", iface, "encryption", security or "psk2")
     else
-        cursor:delete("wireless", wifi_iface_section, "key")
-        cursor:set("wireless", wifi_iface_section, "encryption", "none")
+        cursor:delete("wireless", iface, "key")
+        cursor:set("wireless", iface, "encryption", "none")
     end
-    
     cursor:commit("wireless")
-    
-    -- Перезапуск WiFi (LEDE 17.01 совместимая команда)
-    os.execute("wifi down")
-    os.execute("sleep 2")
+    os.execute("wifi down"); os.execute("sleep 2"); os.execute("wifi up")
+    utils.log("INFO", "WiFi configuration updated for: " .. ssid)
+    return true
+end
+
+function utils.is_daemon_running()
+    local h = io.popen("pgrep -f wififailover-daemon")
+    local pid = h:read("*a"):match("^%s*(.-)%s*$")
+    h:close()
+    return pid and pid ~= ""
+end
+
+function utils.get_status()
+    local s = utils.get_settings()
+    return {
+        enabled = s.enabled == "1",
+        daemon_running = utils.is_daemon_running(),
+        current_network = utils.get_current_wifi() or "Not connected",
+        internet_status = utils.check_internet(s.ping_host) and "Connected" or "Disconnected",
+        ping_host = s.ping_host,
+        auto_switch = s.auto_switch == "1",
+        networks_count = #utils.get_networks()
+    }
+end
+
+return utils
     os.execute("wifi up")
     
     utils.log("INFO", "WiFi configuration updated for: " .. ssid)
