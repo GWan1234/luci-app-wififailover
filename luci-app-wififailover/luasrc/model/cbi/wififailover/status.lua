@@ -1,150 +1,68 @@
-<%#
-Файл: luasrc/view/wififailover/status.htm
-Шаблон страницы статуса WiFi Failover (LEDE 17.01.7)
--%>
-
 <%+header%>
-
-<script type="text/javascript">
-//<![CDATA[
-    var updateTimer;
-    
-    function updateStatus() {
-        XHR.get('<%=REQUEST_URI%>', null, function(xhr, data) {
-            if (data) {
-                updateStatusDisplay(data);
-            }
-        });
-    }
-    
-    function updateStatusDisplay(data) {
-        // Обновление статуса службы
-        var serviceStatus = document.getElementById('service-status');
-        if (serviceStatus) {
-            serviceStatus.className = data.settings.enabled ? 'status-enabled' : 'status-disabled';
-            serviceStatus.innerHTML = data.settings.enabled ? '<%:Enabled%>' : '<%:Disabled%>';
-        }
-        
-        // Обновление статуса демона
-        var daemonStatus = document.getElementById('daemon-status');
-        if (daemonStatus) {
-            daemonStatus.className = data.daemon.running ? 'status-running' : 'status-stopped';
-            daemonStatus.innerHTML = data.daemon.running ? '<%:Running%>' : '<%:Stopped%>';
-            if (data.daemon.pid) {
-                daemonStatus.innerHTML += ' (PID: ' + data.daemon.pid + ')';
-            }
-        }
-        
-        // Обновление текущей сети
-        var currentNetwork = document.getElementById('current-network');
-        if (currentNetwork) {
-            currentNetwork.innerHTML = data.current_wifi.ssid || '<%:Not connected%>';
-            if (data.current_wifi.signal && data.current_wifi.ssid !== 'Not connected') {
-                currentNetwork.innerHTML += ' (' + data.current_wifi.signal + ' dBm, ' + 
-                                          data.current_wifi.quality + '%)';
-            }
-        }
-        
-        // Обновление статуса интернета
-        var internetStatus = document.getElementById('internet-status');
-        if (internetStatus) {
-            internetStatus.className = data.internet.connected ? 'status-connected' : 'status-disconnected';
-            internetStatus.innerHTML = data.internet.connected ? '<%:Connected%>' : '<%:Disconnected%>';
-            internetStatus.innerHTML += ' (' + data.internet.host + ')';
-        }
-    }
-    
-    function testConnection() {
-        var button = document.getElementById('test-button');
-        button.disabled = true;
-        button.value = '<%:Testing...%>';
-        
-        XHR.get('<%=url("admin/services/wififailover/test_connection")%>', null, function(xhr, data) {
-            button.disabled = false;
-            button.value = '<%:Test Connection%>';
-            
-            if (data && data.success) {
-                alert('<%:Connection test successful%> (' + data.response_time + 's)');
-            } else {
-                alert('<%:Connection test failed%>');
-            }
-        });
-    }
-    
-    function scanWiFi() {
-        var button = document.getElementById('scan-button');
-        button.disabled = true;
-        button.value = '<%:Scanning...%>';
-        
-        XHR.get('<%=url("admin/services/wififailover/scan")%>', null, function(xhr, data) {
-            button.disabled = false;
-            button.value = '<%:Scan Networks%>';
-            
-            if (data && data.success) {
-                showScanResults(data.networks);
-            } else {
-                alert('<%:WiFi scan failed%>');
-            }
-        });
-    }
-    
-    function showScanResults(networks) {
-        var html = '<h3><%:Available Networks%></h3><table class="cbi-section-table">';
-        html += '<tr class="cbi-section-table-titles"><th><%:SSID%></th><th><%:Signal%></th><th><%:Quality%></th><th><%:Action%></th></tr>';
-        
-        for (var i = 0; i < networks.length; i++) {
-            var network = networks[i];
-            html += '<tr class="cbi-section-table-row">';
-            html += '<td>' + network.ssid + '</td>';
-            html += '<td>' + network.signal + ' dBm</td>';
-            html += '<td>' + network.quality + '%</td>';
-            html += '<td><input type="button" class="cbi-button" value="<%:Connect%>" onclick="switchNetwork(\'' + network.ssid + '\')" /></td>';
-            html += '</tr>';
-        }
-        html += '</table>';
-        
-        document.getElementById('scan-results').innerHTML = html;
-    }
-    
-    function switchNetwork(ssid) {
-        if (!confirm('<%:Switch to network%> "' + ssid + '"?')) {
-            return;
-        }
-        
-        XHR.post('<%=url("admin/services/wififailover/switch_network")%>', 
-                 'ssid=' + encodeURIComponent(ssid), 
-                 function(xhr, data) {
-            if (data && data.success) {
-                alert('<%:Network switch initiated%>. <%:Please wait for connection...%>');
-                setTimeout(updateStatus, 5000);
-            } else {
-                alert('<%:Network switch failed%>: ' + (data.error || '<%:Unknown error%>'));
-            }
-        });
-    }
-    
-    function toggleAutoRefresh() {
-        var checkbox = document.getElementById('auto-refresh');
-        if (checkbox.checked) {
-            updateTimer = setInterval(updateStatus, 10000);
-        } else {
-            if (updateTimer) {
-                clearInterval(updateTimer);
-            }
-        }
-    }
-    
-    // Инициализация при загрузке страницы
-    document.addEventListener('DOMContentLoaded', function() {
-        updateStatus();
-        document.getElementById('auto-refresh').checked = true;
-        toggleAutoRefresh();
+<script>
+let timer;
+const ids = ['service-status','daemon-status','current-network','internet-status'];
+const classes = {
+    service: ['status-enabled','status-disabled'],
+    daemon: ['status-running','status-stopped'],
+    internet: ['status-connected','status-disconnected']
+};
+function set(id, html, cls) {
+    let e = document.getElementById(id);
+    if (e) { e.innerHTML = html; if (cls) e.className = cls; }
+}
+function updateStatus() {
+    XHR.get('<%=REQUEST_URI%>', null, (_, d) => {
+        if (!d) return;
+        set('service-status', d.settings.enabled ? '<%:Enabled%>' : '<%:Disabled%>', classes.service[+!d.settings.enabled]);
+        let ds = d.daemon, dsTxt = ds.running ? '<%:Running%>' : '<%:Stopped%>';
+        if (ds.pid) dsTxt += ` (PID: ${ds.pid})`;
+        set('daemon-status', dsTxt, classes.daemon[+!ds.running]);
+        let nw = d.current_wifi, nwTxt = nw.ssid || '<%:Not connected%>';
+        if (nw.signal && nw.ssid !== 'Not connected') nwTxt += ` (${nw.signal} dBm, ${nw.quality}%)`;
+        set('current-network', nwTxt);
+        let inet = d.internet, inetTxt = inet.connected ? '<%:Connected%>' : '<%:Disconnected%>';
+        set('internet-status', inetTxt + ` (${inet.host})`, classes.internet[+!inet.connected]);
     });
-//]]>
+}
+function btn(id, txt, dis) { let b=document.getElementById(id); b.disabled=dis; b.value=txt; }
+function testConnection() {
+    btn('test-button','<%:Testing...%>',1);
+    XHR.get('<%=url("admin/services/wififailover/test_connection")%>',null,(_,d)=>{
+        btn('test-button','<%:Test Connection%>',0);
+        alert(d&&d.success?`<%:Connection test successful%> (${d.response_time}s)`:'<%:Connection test failed%>');
+    });
+}
+function scanWiFi() {
+    btn('scan-button','<%:Scanning...%>',1);
+    XHR.get('<%=url("admin/services/wififailover/scan")%>',null,(_,d)=>{
+        btn('scan-button','<%:Scan Networks%>',0);
+        if(d&&d.success) showScanResults(d.networks); else alert('<%:WiFi scan failed%>');
+    });
+}
+function showScanResults(nw) {
+    let html = `<h3><%:Available Networks%></h3><table><tr><th><%:SSID%></th><th><%:Signal%></th><th><%:Quality%></th><th><%:Action%></th></tr>`;
+    nw.forEach(n=>{html+=`<tr><td>${n.ssid}</td><td>${n.signal} dBm</td><td>${n.quality}%</td><td><input type="button" value="<%:Connect%>" onclick="switchNetwork('${n.ssid}')"></td></tr>`});
+    html+='</table>'; document.getElementById('scan-results').innerHTML=html;
+}
+function switchNetwork(ssid) {
+    if(!confirm(`<%:Switch to network%> "${ssid}"?`))return;
+    XHR.post('<%=url("admin/services/wififailover/switch_network")%>','ssid='+encodeURIComponent(ssid),(_,d)=>{
+        alert(d&&d.success?'<%:Network switch initiated%>. <%:Please wait for connection...%>':`<%:Network switch failed%>: ${d.error||'<%:Unknown error%>'}`);
+        if(d&&d.success) setTimeout(updateStatus,5000);
+    });
+}
+function toggleAutoRefresh() {
+    let c=document.getElementById('auto-refresh');
+    if(c.checked) timer=setInterval(updateStatus,1e4); else if(timer) clearInterval(timer);
+}
+document.addEventListener('DOMContentLoaded',()=>{
+    updateStatus();
+    document.getElementById('auto-refresh').checked=1;
+    toggleAutoRefresh();
+});
 </script>
-
-<style type="text/css">
-.status-enabled { color: #0f0; font-weight: bold; }
-.status-disabled { color: #999; }
-.status-running { color: #0f0; font-weight: bold; }
-.
+<style>
+.status-enabled,.status-running{color:#0f0;font-weight:bold;}
+.status-disabled{color:#999;}
+</style>
