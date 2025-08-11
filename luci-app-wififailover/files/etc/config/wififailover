@@ -1,0 +1,38 @@
+# UCI конфигурационный файл для luci-app-wififailover
+# Расположение: files/etc/config/wififailover (для feeds)
+
+# Глобальные настройки (по умолчанию отключено для безопасности)
+config global 'settings'
+	option enabled '0'
+	option ping_host '8.8.8.8'
+	option check_interval '30'
+	option max_failures '3'
+	option connection_timeout '60'
+	option debug '0'
+	option current_network ''
+	option auto_switch '1'
+
+# Пример Wi-Fi сетей
+config network
+	option ssid 'Home_WiFi_5G'
+	option key 'mypassword123'
+	option priority '1'
+	option enabled '1'
+	option security 'psk2'
+	option last_connected '0'
+
+config network
+	option ssid 'Home_WiFi_2.4G'
+	option key 'mypassword123'
+	option priority '2'
+	option enabled '1'
+	option security 'psk2'
+	option last_connected '0'
+
+config network
+	option ssid 'Mobile_Hotspot'
+	option key 'mobile123'
+	option priority '3'
+	option enabled '1'
+	option security 'psk2'
+	option last_connected '0'
