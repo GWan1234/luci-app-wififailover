@@ -4,7 +4,7 @@ START=99
 SCRIPT_FILE_NAME="wifi_failover"
 
 start() {
-    eval "/usr/libexec/wififailover/wifi_failover.sh &" 
+    eval "/usr/libexec/wififailover/$SCRIPT_FILE_NAME &"
 }
 
 stop() {
