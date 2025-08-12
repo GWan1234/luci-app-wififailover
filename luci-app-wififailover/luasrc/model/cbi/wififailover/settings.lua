@@ -1,13 +1,13 @@
 local uci = luci.model.uci.cursor()
 
-local m = Map("wififailover", translate("WiFi Failover Settings"),
+m = Map("wififailover", translate("WiFi Failover Settings"),
     translate("Configure WiFi failover parameters"))
 
 -- Общие настройки
-local s = m:section(NamedSection, "general", translate("General Settings"))
+s = m:section(NamedSection, "general", translate("General Settings"))
 s.addremove = false
 
-local o = s:option(Value, "check_interval", translate("Check Interval (seconds)"))
+o = s:option(Value, "check_interval", translate("Check Interval (seconds)"))
 o.datatype = "uinteger"
 o.default = "30"
 
@@ -36,12 +36,12 @@ function id.cfgvalue(self, section)
 end
 
 -- Fields for WiFi configuration
-local ssid = s:option(Value, "ssid", translate("SSID"))
-local bssid = s:option(Value, "bssid", translate("BSSID"))
-local key = s:option(Value, "key", translate("Password"))
+ssid = s:option(Value, "ssid", translate("SSID"))
+bssid = s:option(Value, "bssid", translate("BSSID"))
+key = s:option(Value, "key", translate("Password"))
 key.password = true
 
-local encr = s:option(ListValue, "encryption", translate("Encryption"))
+encr = s:option(ListValue, "encryption", translate("Encryption"))
 encr:value("none", "No Encryption")
 encr:value("psk", "WPA-PSK")
 encr:value("psk2", "WPA2-PSK")
