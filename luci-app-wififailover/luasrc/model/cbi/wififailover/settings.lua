@@ -15,7 +15,7 @@ o.datatype = "host"
 
 s = m:section(TypedSection, "wifi_network", translate("WiFi Networks"))
 s.addremove = true
-s.anonymous = false
+s.anonymous = true
 s.template = "cbi/tblsection"
 
 ssid = s:option(Value, "ssid", translate("SSID"))
