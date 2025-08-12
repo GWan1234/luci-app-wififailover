@@ -3,7 +3,7 @@ local uci = luci.model.uci.cursor()
 m = Map("wififailover", translate("WiFi Failover Settings"),
     translate("Configure WiFi failover parameters"))
 
--- General settings section
+-- Общие настройки
 s = m:section(NamedSection, "settings", "wifi", translate("General Settings"))
 s.addremove = false
 
@@ -15,18 +15,28 @@ o = s:option(Value, "ping_target", translate("Ping Target"))
 o.datatype = "host"
 o.default = "8.8.8.8"
 
--- WiFi networks section
+-- Секция WiFi сетей с кастомным обработчиком
 s = m:section(TypedSection, "wifi_network", translate("WiFi Networks"))
-s.addremove = true
-s.anonymous = true
 s.template = "cbi/tblsection"
+s.addremove = true
+s.anonymous = false
 
+-- Переопределяем создание новой секции
 function s.create(self, section)
-    local created = TypedSection.create(self, section)
-    uci:set("wififailover", created, "type", "wifi_network")
-    return created
+    -- Создаем анонимную секцию
+    local sid = uci:add("wififailover", "wifi_network")
+    uci:set("wififailover", sid, "type", "wifi_network")
+    return sid
 end
 
+-- Скрываем поле ввода ID
+id = s:option(DummyValue, ".name", translate("ID"))
+id.forcewrite = true
+function id.cfgvalue(self, section)
+    return section
+end
+
+-- Поля для конфигурации WiFi
 ssid = s:option(Value, "ssid", translate("SSID"))
 bssid = s:option(Value, "bssid", translate("BSSID"))
 key = s:option(Value, "key", translate("Password"))
