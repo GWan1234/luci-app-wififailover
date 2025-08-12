@@ -13,7 +13,7 @@ PKG_VERSION:=1.0.0
 PKG_RELEASE:=1
 PKG_MAINTAINER:=WiFi Failover Team <team@wififailover.org>
 
-include ../../luci.mk
+include $(TOPDIR)/feeds/luci/luci.mk
 
 
 # # Дополнительные зависимости для runtime
