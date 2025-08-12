@@ -1,0 +1,17 @@
+{
+    "luci-app-wififailover": {
+        "description": "Grant access to WiFi Failover configuration",
+        "read": {
+            "ubus": {
+                "uci": ["get"]
+            },
+            "uci": ["wififailover"]
+        },
+        "write": {
+            "ubus": {
+                "uci": ["set"]
+            },
+            "uci": ["wififailover"]
+        }
+    }
+}

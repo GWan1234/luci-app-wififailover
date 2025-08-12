@@ -1,0 +1,12 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+SCRIPT_FILE_NAME="wifi_failover"
+
+start() {
+    eval "/usr/libexec/wififailover/wifi_failover.sh &" 
+}
+
+stop() {
+    killall $SCRIPT_FILE_NAME
+}

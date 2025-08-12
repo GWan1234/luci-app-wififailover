@@ -1,0 +1,11 @@
+#!/bin/sh
+
+uci -q batch <<-EOF >/dev/null
+    set wififailover.settings=wifi
+    set wififailover.settings.check_interval='30'
+    set wififailover.settings.ping_target='8.8.8.8'
+    set wififailover.settings.current_idx='0'    
+    commit wififailover
+EOF
+
+exit 0
