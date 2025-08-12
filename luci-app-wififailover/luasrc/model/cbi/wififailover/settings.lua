@@ -4,7 +4,7 @@ m = Map("wififailover", translate("WiFi Failover Settings"),
     translate("Configure WiFi failover parameters"))
 
 -- Общие настройки
-s = m:section(NamedSection, "general", translate("General Settings"))
+s = m:section(NamedSection, "wifi", translate("General Settings"))
 s.addremove = false
 
 o = s:option(Value, "check_interval", translate("Check Interval (seconds)"))
@@ -47,5 +47,29 @@ encr:value("psk", "WPA-PSK")
 encr:value("psk2", "WPA2-PSK")
 encr:value("psk-mixed", "WPA-PSK/WPA2-PSK Mixed Mode")
 encr.default = "psk2"
+
+
+-- Секция произвольных параметров
+s = m:section(TypedSection, "custom_param", translate("Custom Parameters"))
+s.template = "cbi/tblsection"
+s.addremove = true
+s.anonymous = false
+
+function s.create(self, section)
+    local sid = uci:add("wififailover", "custom_param")
+    return sid
+end
+
+s:option(DummyValue, ".name", translate("ID"))
+
+key = s:option(Value, "key", translate("Key"))
+key.placeholder = "parameter_name"
+key.datatype = "string"
+
+value = s:option(Value, "value", translate("Value"))
+value.placeholder = "parameter_value"
+
+return m
+
 
 return m
