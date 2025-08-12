@@ -1,7 +1,7 @@
 #!/bin/sh /etc/rc.common
 
 START=99
-SCRIPT_FILE_NAME="wifi_failover"
+SCRIPT_FILE_NAME="wififailover"
 
 start() {
     eval "/usr/libexec/wififailover/$SCRIPT_FILE_NAME &"

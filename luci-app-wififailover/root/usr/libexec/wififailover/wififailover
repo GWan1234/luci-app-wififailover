@@ -1,17 +1,17 @@
-#!/bin/sh 
+#!/bin/sh
 
 CONFIG_FILE="/etc/config/wififailover"
-LOG_FILE="/var/log/wifi_failover.log" 
+LOG_FILE="/var/log/wifi_failover.log"
 CON_QUALITY=1
 STA_IFACE_INDEX=1
 
-log() {                                                                                                                                                    
+log() {
     # Логирование сообщений в файл, syslog и консоль
-    local message="$1"  
+    local message="$1"
 
-    echo "WIFI_Failover: $message"                                                                                                                                  
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $message" >> "$LOG_FILE"                                                                                          
-    logger -t WIFI_Failover "$message"                                                                                                                   
+    #echo "WIFI_Failover: $message"
+    #echo "$(date '+%Y-%m-%d %H:%M:%S') - $message" >> "$LOG_FILE"
+    logger -t WIFI_Failover "$message"
 }
 
 find_sta_iface_index() {
@@ -30,9 +30,9 @@ find_sta_iface_index() {
 
 init_cnf() {
     # Инициализация конфигурационного файла, если он отсутствует
-    if [ ! -f "$CONFIG_FILE" ]; then   
+    if [ ! -f "$CONFIG_FILE" ]; then
         echo "" > "$CONFIG_FILE"
-        echo "config wifi 'settings'" >> "$CONFIG_FILE"  
+        echo "config wifi 'settings'" >> "$CONFIG_FILE"
         echo "    option check_interval '30'" >> "$CONFIG_FILE"
         echo "    option ping_target '8.8.8.8'" >> "$CONFIG_FILE"
         echo "    option current_idx 0" >> "$CONFIG_FILE"
@@ -132,12 +132,12 @@ get_next_index(){
 
     current_idx=$(get_current_index)
     next_idx=$((current_idx + 1))
-    
+
     if check_exist_wifi_conf "$next_idx"; then
         set_current_index $next_idx
         echo $next_idx
     else
-        set_current_index 0 
+        set_current_index 0
         echo 0
     fi
 }
@@ -163,15 +163,15 @@ switch_wifi(){
     fi
 
     eval $(get_wifi_params $next_index)
-    
+
     log "Переключаемся на WiFi: $ssid"
-    
+
     uci set wireless.@wifi-iface[0].ssid="$ssid"
     uci set wireless.@wifi-iface[0].bssid="$bssid"
     uci set wireless.@wifi-iface[0].key="$key"
     uci set wireless.@wifi-iface[0].encryption="$encryption"
     uci commit wireless
-    
+
     wifi down
     sleep 2
     wifi up
@@ -187,7 +187,7 @@ monitoring(){
         switch_wifi
     fi
 
-    if [ $CON_QUALITY -eq 1 ]; then 
+    if [ $CON_QUALITY -eq 1 ]; then
         if ! check_connection_quality; then
             log "Плохое качество соединения, переключаем WiFi"
             switch_wifi
@@ -204,7 +204,7 @@ main(){
     if find_sta_iface_index; then
         init_cnf
         monitoring
-    else 
+    else
         log "Нет wifi-iface в режиме клиента"
         exit 0
     fi
