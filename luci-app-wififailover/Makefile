@@ -26,7 +26,7 @@ define Package/$(PKG_NAME)/install
     $(INSTALL_BIN) ./root/usr/libexec/wififailover/wififailover $(1)/usr/libexec/wififailover/wififailover
 
 	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./root/etc/config/wififailover $(1)/etc/config/
+	$(INSTALL_CONF) ./root/etc/config/wififailover $(1)/etc/config/wififailover
 
 endef
 
