@@ -37,12 +37,6 @@ encr:value("psk-mixed", "WPA-PSK/WPA2-PSK Mixed Mode")
 
 encr.default = "psk2"
 
--- Добавление кнопки
--- Кастомная кнопка через view
-local btn_section = m:section(TypedSection, "_btn_section", "")
-btn_section.anonymous = true
-btn_section.template = "cbi/btn"
-
 return m
 
 
