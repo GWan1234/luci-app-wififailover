@@ -17,6 +17,7 @@ include $(TOPDIR)/feeds/luci/luci.mk
 
 # Установка init-скрипта с правами на исполнение
 define Package/$(PKG_NAME)/install
+    $(call Package/$(PKG_NAME)/install,$(1))
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./root/etc/init.d/wififailover $(1)/etc/init.d/wififailover
 	$(INSTALL_DIR) $(1)/usr/libexec/wififailover/
