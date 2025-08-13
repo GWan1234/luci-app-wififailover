@@ -15,12 +15,10 @@ PKG_MAINTAINER:=WiFi Failover Team <team@wififailover.org>
 
 include $(TOPDIR)/feeds/luci/luci.mk
 
-define Package/luci-app-wififailover/install
-    $(INSTALL_DIR) $(1)/usr/libexec/wififailover
-    $(INSTALL_BIN) ./files/wififailover $(1)/usr/libexec/wififailover/
-
-
-endef
+# define Package/luci-app-wififailover/install
+#     $(INSTALL_DIR) $(1)/usr/libexec/wififailover
+#     $(INSTALL_BIN) ./files/wififailover $(1)/usr/libexec/wififailover/
+# endef
 
 #     $(INSTALL_DIR) $(1)/etc/init.d
 #     $(INSTALL_BIN) ./files/wififailover.init $(1)/etc/init.d/wififailover
