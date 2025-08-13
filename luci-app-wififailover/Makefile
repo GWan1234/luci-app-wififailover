@@ -19,13 +19,14 @@ define Package/luci-app-wififailover/install
     $(INSTALL_DIR) $(1)/usr/libexec/wififailover
     $(INSTALL_BIN) ./files/wififailover $(1)/usr/libexec/wififailover/
 
-    $(INSTALL_DIR) $(1)/etc/init.d
-    $(INSTALL_BIN) ./files/wififailover.init $(1)/etc/init.d/wififailover
 
-    $(INSTALL_DIR) $(1)/etc/uci-defaults
-    $(INSTALL_BIN) ./files/luci-wififailover $(1)/etc/uci-defaults/
 endef
 
+#     $(INSTALL_DIR) $(1)/etc/init.d
+#     $(INSTALL_BIN) ./files/wififailover.init $(1)/etc/init.d/wififailover
+
+#     $(INSTALL_DIR) $(1)/etc/uci-defaults
+#     $(INSTALL_BIN) ./files/luci-wififailover $(1)/etc/uci-defaults/
 
 # # Дополнительные зависимости для runtime
 # define Package/$(PKG_NAME)/install
