@@ -1,5 +1,4 @@
 # Makefile для luci-app-wififailover (LEDE SDK 17.01.7)
-# Расположение: feeds/wififailover/luci-app-wififailover/Makefile
 
 include $(TOPDIR)/rules.mk
 
@@ -23,7 +22,7 @@ define Package/$(PKG_NAME)/install
     $(INSTALL_DIR) $(1)/usr/libexec/wififailover/
     $(INSTALL_BIN) ./root/usr/libexec/wififailover/wififailover $(1)/usr/libexec/wififailover/wififailover
 	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./root/etc/config/wififailover $(1)/etc/config/wififailover
+	$(INSTALL_BIN) ./root/etc/config/wififailover $(1)/etc/config/wififailover
 endef
 
 # Компиляция не требуется для LuCI приложения
