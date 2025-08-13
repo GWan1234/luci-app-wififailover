@@ -4,7 +4,7 @@ m = Map("wififailover", translate("WiFi Failover Settings"),
     translate("Configure WiFi failover parameters"))
 
 -- Общие настройки
-s = m:section(NamedSection, "wifi", translate("General Settings"))
+s = m:section(NamedSection, "settings", translate("General Settings"))
 s.addremove = false
 
 o = s:option(Value, "check_interval", translate("Check Interval (seconds)"))
@@ -14,6 +14,9 @@ o.default = "30"
 o = s:option(Value, "ping_target", translate("Ping Target"))
 o.datatype = "host"
 o.default = "8.8.8.8"
+
+o = s:option(Flag, "check_quality", translate("Check connect quality"))
+o.default = true
 
 
 s = m:section(TypedSection, "wifi_network", translate("Static Leases"))
@@ -31,7 +34,14 @@ encr:value("none", "No Encryption")
 encr:value("psk", "WPA-PSK")
 encr:value("psk2", "WPA2-PSK")
 encr:value("psk-mixed", "WPA-PSK/WPA2-PSK Mixed Mode")
+
 encr.default = "psk2"
+
+-- Добавление кнопки
+-- Кастомная кнопка через view
+local btn_section = m:section(TypedSection, "_btn_section", "")
+btn_section.anonymous = true
+btn_section.template = "cbi/btn"
 
 return m
 
