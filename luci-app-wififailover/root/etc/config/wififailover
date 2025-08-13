@@ -1,4 +1,5 @@
-config settings 'wifi'
+config wifi 'settings'
     option check_interval '30'
     option ping_target '8.8.8.8'
     option current_idx '0'
+    option check_quality '1'

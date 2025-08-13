@@ -1,21 +1,24 @@
 #!/bin/sh
 
+DEBUG='0'
 CONFIG_FILE="/etc/config/wififailover"
 LOG_FILE="/var/log/wifi_failover.log"
-CON_QUALITY=1
-STA_IFACE_INDEX=1
+# Глобальная переменная для хранения индекса STA-интерфейса. Определяется при запуске.
+STA_IFACE_INDEX=""
 
 log() {
     # Логирование сообщений в файл, syslog и консоль
     local message="$1"
 
-    #echo "WIFI_Failover: $message"
-    #echo "$(date '+%Y-%m-%d %H:%M:%S') - $message" >> "$LOG_FILE"
+    if [ "$DEBUG" = "1" ]; then
+        echo "WIFI_Failover: $message"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - $message" >> "$LOG_FILE"
+    fi
     logger -t WIFI_Failover "$message"
 }
 
 find_sta_iface_index() {
-    #находит индекс wifi-iface с режимом sta (клиентский режим):
+    # Находит индекс wifi-iface с режимом sta (клиентский режим)
 
     local index=0
     while uci -q get wireless.@wifi-iface[$index] >/dev/null; do
@@ -25,33 +28,28 @@ find_sta_iface_index() {
         fi
         index=$((index + 1))
     done
+    log "Клиентский Wi-Fi интерфейс (sta) не найден."
     return 1
 }
 
 init_cnf() {
     # Инициализация конфигурационного файла, если он отсутствует
     if [ ! -f "$CONFIG_FILE" ]; then
-        echo "" > "$CONFIG_FILE"
-        echo "config wifi 'settings'" >> "$CONFIG_FILE"
-        echo "    option check_interval '30'" >> "$CONFIG_FILE"
-        echo "    option ping_target '8.8.8.8'" >> "$CONFIG_FILE"
-        echo "    option current_idx 0" >> "$CONFIG_FILE"
-
-        log "config file was create $CONFIG_FILE"
+        log "Конфигурационный файл не найден. Создание файла по умолчанию: $CONFIG_FILE"
+        cat > "$CONFIG_FILE" <<EOF
+config wifi 'settings'
+    option check_interval '30'
+    option ping_target '8.8.8.8'
+    option current_idx '0'
+    option check_quality '1'
+EOF
     fi
 }
 
 check_internet() {
     # Проверка доступности интернета через ping
-    local ping_ok=0
-    local http_ok=1
-
     local target=$(uci -q get $CONFIG_FILE.settings.ping_target)
-    if ping -c 2 -W 3 "$target" >/dev/null 2>&1; then
-        ping_ok=1
-    fi
-
-    if [ $ping_ok -eq 1 ] && [ $http_ok -eq 1 ]; then
+    if ping -c 2 -W 3 "${target:-8.8.8.8}" >/dev/null 2>&1; then
         return 0  # Интернет есть
     else
         return 1  # Интернета нет
@@ -60,20 +58,20 @@ check_internet() {
 
 
 check_connection_quality() {
-    local target=$(uci -q get $CONFIG_FILE.settings.ping_target)
+    local target=$(uci -q get $CONFIG_FILE.settings.ping_target) || "8.8.8.8"
     local ping_count=20     # Увеличим количество пакетов для лучшей статистики
     local max_packet_loss=20  # Максимально допустимые потери пакетов в %
     local max_duplicates=20   # Максимально допустимые дубликаты в %
 
     # Выполняем ping и получаем полную статистику
-    local ping_output=$(ping -c $ping_count -q $target 2>&1)
+    local ping_output=$(ping -c "$ping_count" -q "$target" 2>&1)
 
-     # Исправленное извлечение packet loss (только число)
-    local packet_loss=$(echo "$ping_output" | awk -F'[, %]' '{for(i=1;i<=NF;i++) if ($i == "loss") print $(i-3)}')
+    # Более надежное извлечение packet loss (только число)
+    local packet_loss=$(echo "$ping_output" | grep -o '[0-9]\+% packet loss' | cut -d'%' -f1)
     packet_loss=${packet_loss:-100}  # Если не найдено, считаем 100% потерь
 
-    # Извлечение duplicates (только число)
-    local duplicates=$(echo "$ping_output" | awk -F'[, %]' '{for(i=1;i<=NF;i++) if ($i == "duplicates") print $(i-1)}')
+    # Более надежное извлечение duplicates (только число)
+    local duplicates=$(echo "$ping_output" | grep -o '[0-9]\+ duplicates' | cut -d' ' -f1)
     duplicates=${duplicates:-0}  # Если не найдено, считаем 0 дубликатов
 
     if [ "$packet_loss" -gt 99 ]; then
@@ -108,17 +106,14 @@ set_current_index(){
     # Установка текущего индекса WiFi-конфигурации
     local index=$1
 
-    $(uci set $CONFIG_FILE.settings.current_idx=$index)
-
+    uci set $CONFIG_FILE.settings.current_idx="$index"
 }
 
 check_exist_wifi_conf(){
     # Проверка наличия WiFi-конфигурации по индексу
     local index=$1
-    local ssid
 
-    ssid=$(uci -q get "$CONFIG_FILE.@wifi_network[$index].ssid")
-    if [ -n "$ssid" ]; then
+    if uci -q get "$CONFIG_FILE.@wifi_network[$index]" >/dev/null; then
         return 0  # настройка есть
     else
         return 1  # настройки нет
@@ -126,7 +121,8 @@ check_exist_wifi_conf(){
 }
 
 get_next_index(){
-    # Получение следующего индекса WiFi-конфигурации, сброс на 0 если не найден
+    # Получение следующего индекса WiFi-конфигурации.
+    # Если следующего нет, возвращается 0 (циклическое переключение).
     local current_idx
     local next_idx
 
@@ -134,67 +130,70 @@ get_next_index(){
     next_idx=$((current_idx + 1))
 
     if check_exist_wifi_conf "$next_idx"; then
-        set_current_index $next_idx
-        echo $next_idx
+        echo "$next_idx"
     else
-        set_current_index 0
-        echo 0
+        echo "0"
     fi
-}
-
-get_wifi_params() {
-    # Получение параметров WiFi-сети по индексу
-    local index=$1
-
-    echo "ssid=$(uci -q get $CONFIG_FILE.@wifi_network[$index].ssid)"
-    echo "bssid=$(uci -q get $CONFIG_FILE.@wifi_network[$index].bssid)"
-    echo "key=$(uci -q get $CONFIG_FILE.@wifi_network[$index].key)"
-    echo "encryption=$(uci -q get $CONFIG_FILE.@wifi_network[$index].encryption)"
 }
 
 switch_wifi(){
     # Переключение на следующую WiFi-сеть из конфигурации
     local next_index
+    local ssid bssid key encryption
 
     next_index=$(get_next_index)
     if ! check_exist_wifi_conf "$next_index"; then
-        log "WiFi конфиг не найден, выход"
-        return
+        log "Резервные WiFi конфиги не найдены. Некуда переключаться."
+        return 1
     fi
 
-    eval $(get_wifi_params $next_index)
+    # Безопасно получаем параметры, избегая eval
+    ssid=$(uci -q get "$CONFIG_FILE.@wifi_network[$next_index].ssid")
+    bssid=$(uci -q get "$CONFIG_FILE.@wifi_network[$next_index].bssid")
+    key=$(uci -q get "$CONFIG_FILE.@wifi_network[$next_index].key")
+    encryption=$(uci -q get "$CONFIG_FILE.@wifi_network[$next_index].encryption")
 
-    log "Переключаемся на WiFi: $ssid"
+    log "Переключаемся на WiFi: '$ssid' (индекс $next_index)"
 
-    uci set wireless.@wifi-iface[0].ssid="$ssid"
-    uci set wireless.@wifi-iface[0].bssid="$bssid"
-    uci set wireless.@wifi-iface[0].key="$key"
-    uci set wireless.@wifi-iface[0].encryption="$encryption"
+    # Обновляем индекс в конфиге, чтобы при следующем сбое перейти к следующей сети
+    set_current_index "$next_index"
+    uci commit wififailover
+
+    uci set wireless.@wifi-iface["$STA_IFACE_INDEX"].ssid="$ssid"
+    uci set wireless.@wifi-iface["$STA_IFACE_INDEX"].bssid="$bssid"
+    uci set wireless.@wifi-iface["$STA_IFACE_INDEX"].key="$key"
+    uci set wireless.@wifi-iface["$STA_IFACE_INDEX"].encryption="$encryption"
     uci commit wireless
 
+    log "Перезапуск Wi-Fi интерфейса..."
     wifi down
     sleep 2
     wifi up
     sleep 10
+    return 0
 }
 
 monitoring(){
     # Основной цикл мониторинга доступности интернета и переключения WiFi
     while true; do
+        local needs_switch=0
+        local check_quality_enabled=$(uci -q get $CONFIG_FILE.settings.check_quality)
 
-    if ! check_internet; then
-        log "Интернет недоступен, переключаем WiFi"
-        switch_wifi
-    fi
+        if ! check_internet; then
+            log "Интернет недоступен."
+            needs_switch=1
+        elif [ "$check_quality_enabled" = "1" ] && ! check_connection_quality; then
+            log "Плохое качество соединения."
+            needs_switch=1
+        fi
 
-    if [ $CON_QUALITY -eq 1 ]; then
-        if ! check_connection_quality; then
-            log "Плохое качество соединения, переключаем WiFi"
+        if [ "$needs_switch" -eq 1 ]; then
+            log "Требуется переключение WiFi."
             switch_wifi
         fi
-    fi
 
-    sleep $(uci -q get $CONFIG_FILE.settings.check_interval)
+        local interval=$(uci -q get $CONFIG_FILE.settings.check_interval)
+        sleep "${interval:-30}"
     done
 }
 
@@ -202,11 +201,11 @@ monitoring(){
 main(){
     # Точка входа: инициализация и запуск мониторинга
     if find_sta_iface_index; then
+        log "Запуск демона. Клиентский интерфейс найден: $STA_IFACE_INDEX"
         init_cnf
         monitoring
     else
-        log "Нет wifi-iface в режиме клиента"
-        exit 0
+        exit 1
     fi
 }
 

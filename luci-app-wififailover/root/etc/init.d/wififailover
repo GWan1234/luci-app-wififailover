@@ -1,12 +1,33 @@
 #!/bin/sh /etc/rc.common
 
+# Указываем, что мы используем procd
+USE_PROCD=1
+# Приоритет запуска, 99 — один из последних, что обычно хорошо для пользовательских скриптов
 START=99
-SCRIPT_FILE_NAME="wififailover"
 
-start() {
-    eval "/usr/libexec/wififailover/$SCRIPT_FILE_NAME &"
+# Путь к исполняемому файлу вашего демона
+PROG="/usr/libexec/wififailover/wififailover"
+
+start_service() {
+    # Начинаем определение нового экземпляра службы для procd
+    procd_open_instance
+
+    # Указываем команду для запуска. procd будет управлять этим процессом.
+    procd_set_param command "$PROG"
+
+    # Если ваш скрипт требует интерпретатора (например, python или sh),
+    # используйте такую строку вместо предыдущей:
+    # procd_set_param command /usr/bin/python "$PROG"
+
+    # Указываем procd автоматически перезапускать службу, если она "упадет"
+    procd_set_param respawn
+
+    # Перенаправляем стандартный вывод и вывод ошибок в системный лог (logd)
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+
+    # Завершаем определение службы
+    procd_close_instance
 }
 
-stop() {
-    killall $SCRIPT_FILE_NAME
-}
+# Функция stop() больше не нужна, procd сам управляет остановкой службы.
