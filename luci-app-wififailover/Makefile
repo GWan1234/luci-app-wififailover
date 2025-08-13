@@ -19,8 +19,8 @@ include $(TOPDIR)/feeds/luci/luci.mk
 define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./root/etc/init.d/wififailover $(1)/etc/init.d/wififailover
-    $(INSTALL_DIR) $(1)/usr/libexec/wififailover/
-    $(INSTALL_BIN) ./root/usr/libexec/wififailover/wififailover $(1)/usr/libexec/wififailover/wififailover
+	$(INSTALL_DIR) $(1)/usr/libexec/wififailover/
+	$(INSTALL_BIN) ./root/usr/libexec/wififailover/wififailover $(1)/usr/libexec/wififailover/wififailover
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_BIN) ./root/etc/config/wififailover $(1)/etc/config/wififailover
 endef
