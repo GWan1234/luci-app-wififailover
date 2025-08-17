@@ -7,6 +7,9 @@ m = Map("wififailover", translate("WiFi Failover Settings"),
 s = m:section(NamedSection, "settings", translate("General Settings"))
 s.addremove = false
 
+o = s:option(Flag, "enable", translate("Enable WiFi Failover"))
+o.default = true
+
 o = s:option(Value, "check_interval", translate("Check Interval (seconds)"))
 o.datatype = "uinteger"
 o.default = "30"
@@ -18,7 +21,20 @@ o.default = "8.8.8.8"
 o = s:option(Flag, "check_quality", translate("Check connect quality"))
 o.default = true
 
+o = s:option(Value, "ping_count", translate("Ping Count"))
+o.datatype = "uinteger"
+o.default = "20"
 
+o = s:option(Value, "max_packet_loss", translate("Max Packet Loss (%)"))
+o.datatype = "uinteger"
+o.default = "30"
+
+o = s:option(Value, "max_duplicates", translate("Max Packet Duplicates (%)"))
+o.datatype = "uinteger"
+o.default = "30"
+
+
+-- Настройки подключения к точкам доступа
 s = m:section(TypedSection, "wifi_network", translate("Static Leases"))
 s.addremove = true
 s.anonymous = true

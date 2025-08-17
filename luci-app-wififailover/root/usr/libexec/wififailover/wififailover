@@ -2,7 +2,9 @@
 
 DEBUG='0'
 CONFIG_FILE="/etc/config/wififailover"
+CONFIG_NAME="wififailover"
 LOG_FILE="/var/log/wifi_failover.log"
+
 # Глобальная переменная для хранения индекса STA-интерфейса. Определяется при запуске.
 STA_IFACE_INDEX=""
 
@@ -38,17 +40,21 @@ init_cnf() {
         log "Конфигурационный файл не найден. Создание файла по умолчанию: $CONFIG_FILE"
         cat > "$CONFIG_FILE" <<EOF
 config wifi 'settings'
+    option enable '1'
+    option current_idx '0'
     option check_interval '30'
     option ping_target '8.8.8.8'
-    option current_idx '0'
     option check_quality '1'
+    option ping_count '20'
+    option max_packet_loss '30'
+    option max_duplicates '30'
 EOF
     fi
 }
 
 check_internet() {
     # Проверка доступности интернета через ping
-    local target=$(uci -q get $CONFIG_FILE.settings.ping_target)
+    local target=$(uci -q get "$CONFIG_NAME.settings.ping_target")
     if ping -c 2 -W 3 "${target:-8.8.8.8}" >/dev/null 2>&1; then
         return 0  # Интернет есть
     else
@@ -58,10 +64,21 @@ check_internet() {
 
 
 check_connection_quality() {
-    local target=$(uci -q get $CONFIG_FILE.settings.ping_target) || "8.8.8.8"
-    local ping_count=20     # Увеличим количество пакетов для лучшей статистики
-    local max_packet_loss=20  # Максимально допустимые потери пакетов в %
-    local max_duplicates=20   # Максимально допустимые дубликаты в %
+    local target
+    target=$(uci -q get "$CONFIG_NAME.settings.ping_target")
+    target="${target:-8.8.8.8}"
+
+    # Увеличим количество пакетов для лучшей статистики
+    local ping_count=$(uci -q get "$CONFIG_NAME.settings.ping_count")
+    ping_count="${ping_count:-20}"
+
+    # Максимально допустимые потери пакетов в %
+    local max_packet_loss=$(uci -q get "$CONFIG_NAME.settings.max_packet_loss")
+    max_packet_loss="${max_packet_loss:-20}"
+
+    # Максимально допустимые дубликаты в %
+    local max_duplicates=$(uci -q get "$CONFIG_NAME.settings.max_duplicates")
+    max_duplicates="${max_duplicates:-20}"
 
     # Выполняем ping и получаем полную статистику
     local ping_output=$(ping -c "$ping_count" -q "$target" 2>&1)
@@ -97,7 +114,7 @@ get_current_index(){
     # Получение текущего индекса WiFi-конфигурации
     local current_idx
 
-    current_idx=$(uci -q get $CONFIG_FILE.settings.current_idx)
+    current_idx=$(uci -q get "$CONFIG_NAME.settings.current_idx")
     current_idx="${current_idx:-0}"
     echo "$current_idx"
 }
@@ -106,14 +123,14 @@ set_current_index(){
     # Установка текущего индекса WiFi-конфигурации
     local index=$1
 
-    uci set $CONFIG_FILE.settings.current_idx="$index"
+    uci set "$CONFIG_NAME.settings.current_idx" "$index"
 }
 
 check_exist_wifi_conf(){
     # Проверка наличия WiFi-конфигурации по индексу
     local index=$1
 
-    if uci -q get "$CONFIG_FILE.@wifi_network[$index]" >/dev/null; then
+    if uci -q get "$CONFIG_NAME.@wifi_network[$index]" >/dev/null; then
         return 0  # настройка есть
     else
         return 1  # настройки нет
@@ -148,16 +165,16 @@ switch_wifi(){
     fi
 
     # Безопасно получаем параметры, избегая eval
-    ssid=$(uci -q get "$CONFIG_FILE.@wifi_network[$next_index].ssid")
-    bssid=$(uci -q get "$CONFIG_FILE.@wifi_network[$next_index].bssid")
-    key=$(uci -q get "$CONFIG_FILE.@wifi_network[$next_index].key")
-    encryption=$(uci -q get "$CONFIG_FILE.@wifi_network[$next_index].encryption")
+    ssid=$(uci -q get "$CONFIG_NAME.@wifi_network[$next_index].ssid")
+    bssid=$(uci -q get "$CONFIG_NAME.@wifi_network[$next_index].bssid")
+    key=$(uci -q get "$CONFIG_NAME.@wifi_network[$next_index].key")
+    encryption=$(uci -q get "$CONFIG_NAME.@wifi_network[$next_index].encryption")
 
     log "Переключаемся на WiFi: '$ssid' (индекс $next_index)"
 
     # Обновляем индекс в конфиге, чтобы при следующем сбое перейти к следующей сети
     set_current_index "$next_index"
-    uci commit wififailover
+    uci commit "$CONFIG_NAME"
 
     uci set wireless.@wifi-iface["$STA_IFACE_INDEX"].ssid="$ssid"
     uci set wireless.@wifi-iface["$STA_IFACE_INDEX"].bssid="$bssid"
@@ -176,23 +193,28 @@ switch_wifi(){
 monitoring(){
     # Основной цикл мониторинга доступности интернета и переключения WiFi
     while true; do
-        local needs_switch=0
-        local check_quality_enabled=$(uci -q get $CONFIG_FILE.settings.check_quality)
+        local is_enable=$(uci -q get "$CONFIG_NAME.settings.enable")
+        is_enable="${is_enable:-0}"
 
-        if ! check_internet; then
-            log "Интернет недоступен."
-            needs_switch=1
-        elif [ "$check_quality_enabled" = "1" ] && ! check_connection_quality; then
-            log "Плохое качество соединения."
-            needs_switch=1
+        if [ "$is_enable" -eq 1 ]; then
+            local needs_switch=0
+            local check_quality_enabled=$(uci -q get "$CONFIG_NAME.settings.check_quality")
+
+            if ! check_internet; then
+                log "Интернет недоступен."
+                needs_switch=1
+            elif [ "$check_quality_enabled" = "1" ] && ! check_connection_quality; then
+                log "Плохое качество соединения."
+                needs_switch=1
+            fi
+
+            if [ "$needs_switch" -eq 1 ]; then
+                log "Требуется переключение WiFi."
+                switch_wifi
+            fi
         fi
-
-        if [ "$needs_switch" -eq 1 ]; then
-            log "Требуется переключение WiFi."
-            switch_wifi
-        fi
-
-        local interval=$(uci -q get $CONFIG_FILE.settings.check_interval)
+        # Пауза должна быть вне условия, чтобы избежать бесконечного цикла, когда демон отключен
+        local interval=$(uci -q get "$CONFIG_NAME.settings.check_interval")
         sleep "${interval:-30}"
     done
 }

@@ -2,10 +2,15 @@
 
 uci -q batch <<-EOF >/dev/null
     set wififailover.settings=wifi
+    set wififailover.settings.enable='1'
+    set wififailover.settings.current_idx='0'
     set wififailover.settings.check_interval='30'
     set wififailover.settings.ping_target='8.8.8.8'
-    set wififailover.settings.current_idx='0'
     set wififailover.settings.check_quality='1'
+    set wififailover.settings.ping_count='20'
+    set wififailover.settings.max_packet_loss='30'
+    set wififailover.settings.max_duplicates='30'
+
     commit wififailover
 EOF
 
