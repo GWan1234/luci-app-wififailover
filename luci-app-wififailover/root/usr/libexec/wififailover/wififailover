@@ -123,7 +123,7 @@ set_current_index(){
     # Установка текущего индекса WiFi-конфигурации
     local index=$1
 
-    uci set "$CONFIG_NAME.settings.current_idx" "$index"
+    uci set "$CONFIG_NAME.settings.current_idx=$index"
 }
 
 check_exist_wifi_conf(){
